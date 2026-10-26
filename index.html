@@ -1,0 +1,2740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feed Trump Popcorn 🍿 — Tírale Palomitas a la Boca</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Comic Sans MS', 'Arial', sans-serif;
+  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 50%, #1e3a8a 100%);
+  color: white;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* HUD */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.score-panel, .level-panel, .combo-panel {
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  backdrop-filter: blur(8px);
+}
+
+.score-panel .label, .level-panel .label, .combo-panel .label {
+  font-size: 10px;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.score-panel .value {
+  font-size: 24px;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+.level-panel .value {
+  font-size: 24px;
+  color: #60a5fa;
+  text-shadow: 0 0 8px rgba(96, 165, 250, 0.6);
+}
+
+.combo-panel .value {
+  font-size: 24px;
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.6);
+}
+
+.combo-panel.hidden { display: none; }
+
+/* Speech bubble */
+#speech-bubble {
+  position: absolute;
+  background: white;
+  color: black;
+  padding: 12px 18px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: bold;
+  max-width: 320px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border: 3px solid #1e40af;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+#speech-bubble.visible { opacity: 1; }
+
+#speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+  border-top-color: white;
+}
+
+/* Popcorn counter */
+.popcorn-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: bold;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.popcorn-counter .popcorn-count {
+  color: #fbbf24;
+  font-size: 20px;
+  margin: 0 4px;
+}
+
+/* Projectile selector */
+.projectile-selector {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+
+.proj-btn {
+  position: relative;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  font-family: inherit;
+  color: white;
+  transition: all 0.15s;
+}
+.proj-btn:hover:not(.disabled) {
+  background: rgba(30, 58, 138, 0.8);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+.proj-btn.active {
+  background: rgba(34, 197, 94, 0.3);
+  border-color: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+}
+.proj-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.proj-emoji { font-size: 22px; }
+.proj-name { font-size: 10px; font-weight: bold; }
+.proj-ammo {
+  font-size: 11px;
+  color: #fbbf24;
+  font-weight: bold;
+}
+.proj-lock {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #dc2626;
+  color: white;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+/* Start screen */
+#start-screen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(30, 58, 138, 0.7) 0%, rgba(30, 64, 175, 0.3) 60%, rgba(30, 58, 138, 0.6) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  z-index: 100;
+  padding: 30px 40px;
+  text-align: left;
+  pointer-events: auto;
+  max-width: 65%;
+}
+
+#start-screen h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  color: #fbbf24;
+  text-shadow: 0 0 16px rgba(251, 191, 36, 0.8), 4px 4px 0 #000;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+#start-screen .subtitle {
+  font-size: 14px;
+  color: white;
+  margin-bottom: 20px;
+  max-width: 500px;
+  line-height: 1.4;
+}
+
+#start-screen .instructions {
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  max-width: 480px;
+}
+
+#start-screen .instructions h3 {
+  color: #fbbf24;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+#start-screen .instructions ul {
+  list-style: none;
+  text-align: left;
+}
+
+#start-screen .instructions li {
+  font-size: 14px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#start-screen .instructions li::before {
+  content: '🍿';
+  font-size: 18px;
+}
+
+#start-btn {
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+  color: white;
+  border: 4px solid #fbbf24;
+  border-radius: 12px;
+  padding: 16px 48px;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 2px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s;
+}
+
+#start-btn:hover { transform: scale(1.05); }
+#start-btn:active { transform: scale(0.98); }
+
+/* Game over screen */
+#game-over {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#game-over.show { display: flex; }
+
+#game-over h2 {
+  font-size: 48px;
+  color: #ef4444;
+  text-shadow: 0 0 16px rgba(239, 68, 68, 0.6), 4px 4px 0 #000;
+  margin-bottom: 16px;
+}
+
+#game-over .final-score {
+  font-size: 24px;
+  margin-bottom: 32px;
+}
+
+#game-over .final-score .big {
+  font-size: 64px;
+  color: #fbbf24;
+  display: block;
+  text-shadow: 0 0 16px rgba(251, 191, 36, 0.6);
+}
+
+#restart-btn {
+  background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+  color: white;
+  border: 4px solid #fbbf24;
+  border-radius: 12px;
+  padding: 12px 36px;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Floating score */
+.floating-score {
+  position: absolute;
+  pointer-events: none;
+  font-size: 20px;
+  font-weight: bold;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 2px 2px 0 #000;
+  z-index: 15;
+  animation: floatUp 1s ease-out forwards;
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-60px); opacity: 0; }
+}
+</style>
+</head>
+<body>
+<div id="game-container">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="score-panel">
+      <div class="label">Score</div>
+      <div class="value" id="score">0</div>
+    </div>
+    <div class="combo-panel hidden" id="combo-panel">
+      <div class="label">Combo</div>
+      <div class="value" id="combo">x1</div>
+    </div>
+    <div class="level-panel">
+      <div class="label">Nivel</div>
+      <div class="value" id="level">1</div>
+    </div>
+    <button id="mute-btn" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.6);border:2px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 12px;font-size:18px;cursor:pointer;z-index:11;color:white;font-family:inherit;" title="Silenciar">🔊</button>
+  </div>
+
+  <!-- Speech bubble -->
+  <div id="speech-bubble"></div>
+
+  <!-- Popcorn counter -->
+  <div class="popcorn-counter">
+    Palomitas: <span class="popcorn-count" id="popcorn-count">20</span>
+    <span style="opacity:0.6">· Recarga: espera 1s sin tirar</span>
+  </div>
+
+  <!-- Projectile selector -->
+  <div id="projectile-selector" class="projectile-selector"></div>
+
+  <!-- Start screen -->
+  <div id="start-screen">
+    <h1>🍿 FEED THEM POPCORN 🍿</h1>
+    <p class="subtitle">¡Elige a tu víctima y tírale palomitas antes de que diga una incoherencia!</p>
+    <!-- Selector de personaje -->
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="char-btn active" data-char="trump" style="background:rgba(30,58,138,0.5);border:3px solid #fbbf24;border-radius:12px;padding:12px 16px;cursor:pointer;color:white;font-family:inherit;text-align:center;">
+        <div style="font-size:32px;">🇺🇸</div>
+        <div style="font-size:14px;font-weight:bold;margin-top:4px;">Trump</div>
+      </button>
+      <button class="char-btn" data-char="miley" style="background:rgba(217,70,239,0.3);border:3px solid rgba(255,255,255,0.2);border-radius:12px;padding:12px 16px;cursor:pointer;color:white;font-family:inherit;text-align:center;">
+        <div style="font-size:32px;">🇦🇷</div>
+        <div style="font-size:14px;font-weight:bold;margin-top:4px;">Miley</div>
+      </button>
+      <button class="char-btn" data-char="netanyahu" style="background:rgba(0,56,184,0.3);border:3px solid rgba(255,255,255,0.2);border-radius:12px;padding:12px 16px;cursor:pointer;color:white;font-family:inherit;text-align:center;">
+        <div style="font-size:32px;">🇮🇱</div>
+        <div style="font-size:14px;font-weight:bold;margin-top:4px;">Netanyahu</div>
+      </button>
+      <button class="char-btn" data-char="bolsonaro" style="background:rgba(0,156,59,0.3);border:3px solid rgba(255,255,255,0.2);border-radius:12px;padding:12px 16px;cursor:pointer;color:white;font-family:inherit;text-align:center;">
+        <div style="font-size:32px;">🇧🇷</div>
+        <div style="font-size:14px;font-weight:bold;margin-top:4px;">Bolsonaro</div>
+      </button>
+    </div>
+    <div class="instructions">
+      <h3>Cómo jugar</h3>
+      <ul>
+        <li>Clic para lanzar una palomita</li>
+        <li>Mantén clic para ráfaga de palomitas</li>
+        <li>Acierte cuando la boca esté ABIERTA</li>
+        <li>Si le das con la boca cerrada, rebota</li>
+        <li>Combo de 3+ = más puntos</li>
+        <li>3 créditos: pierdes 1 por cada frase completa que diga</li>
+        <li>Sube de nivel para desbloquear: 🥬 col · 🍅 tomate · 🥔 papa · 🍉 sandía</li>
+        <li>Tira 5 pedos para ganar la partida</li>
+      </ul>
+    </div>
+    <button id="start-btn">¡JUGAR!</button>
+    <p style="margin-top: 14px; font-size: 14px; opacity: 0.9; color: #fbbf24;">
+      Pulsa <kbd style="background:#fff;color:#1e3a8a;padding:2px 8px;border-radius:4px;font-weight:bold;">ESPACIO</kbd> o <kbd style="background:#fff;color:#1e3a8a;padding:2px 8px;border-radius:4px;font-weight:bold;">ENTER</kbd> para empezar
+    </p>
+  </div>
+
+  <!-- Game over -->
+  <div id="game-over">
+    <h2 id="game-over-title">¡SE ATROGANÓ!</h2>
+    <div class="final-score">
+      Trump dijo una incoherencia completa. Tu puntaje:
+      <span class="big" id="final-score">0</span>
+    </div>
+    <button id="restart-btn">Intentar de nuevo</button>
+    <p style="margin-top: 14px; font-size: 14px; opacity: 0.9; color: #fbbf24;">
+      Pulsa <kbd style="background:#fff;color:#1e3a8a;padding:2px 8px;border-radius:4px;font-weight:bold;">ESPACIO</kbd> o <kbd style="background:#fff;color:#1e3a8a;padding:2px 8px;border-radius:4px;font-weight:bold;">ENTER</kbd> para reintentar
+    </p>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ===================================================================
+// FEED TRUMP POPCORN — Single-file game
+// ===================================================================
+
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+
+let W = window.innerWidth, H = window.innerHeight;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ============ AUDIO ENGINE (Web Audio API — sin archivos externos) ============
+let audioCtx = null;
+let soundEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+// Reproduce un tono con envelope ADSR simple
+function playTone(freq, duration, type, volume, when) {
+  if (!soundEnabled || !audioCtx) return;
+  const t = when || audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume || 0.3, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + duration);
+}
+
+// Reproduce ruido (para pedos, explosiones, etc)
+function playNoise(duration, volume, filterFreq, when) {
+  if (!soundEnabled || !audioCtx) return;
+  const t = when || audioCtx.currentTime;
+  const bufferSize = audioCtx.sampleRate * duration;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = filterFreq || 400;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume || 0.3, t + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  noise.start(t);
+  noise.stop(t + duration);
+}
+
+// Slide de frecuencia (para lanzamientos)
+function playSlide(freqStart, freqEnd, duration, type, volume) {
+  if (!soundEnabled || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'square';
+  osc.frequency.setValueAtTime(freqStart, t);
+  osc.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume || 0.15, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + duration);
+}
+
+// ============ EFECTOS DE SONIDO DEL JUEGO ============
+const SFX = {
+  // Lanzar palomita: "pop" corto y agudo
+  throw() {
+    playSlide(200, 600, 0.15, 'square', 0.1);
+  },
+
+  // Acertar en la boca: "ñam" + campana de puntos
+  hit() {
+    playTone(523, 0.1, 'sine', 0.2);  // Do
+    playTone(659, 0.15, 'sine', 0.2, audioCtx.currentTime + 0.05);  // Mi
+    playTone(784, 0.2, 'sine', 0.2, audioCtx.currentTime + 0.1);   // Sol
+    // Sonido de "ñam" (grave corto)
+    playTone(120, 0.1, 'triangle', 0.25);
+  },
+
+  // Rebotar en la cara: "boing"
+  bounce() {
+    playSlide(300, 100, 0.2, 'sine', 0.2);
+  },
+
+  // Pedo enorme: ruido + tonos graves
+  fart() {
+    // Parte 1: ruido grave (el pedo)
+    playNoise(0.8, 0.35, 250);
+    // Parte 2: tono que baja (el desinflarse)
+    playSlide(150, 50, 0.6, 'sawtooth', 0.2);
+    // Parte 3: "eco" del pedo
+    setTimeout(() => {
+      playNoise(0.4, 0.15, 200);
+    }, 200);
+  },
+
+  // Game over: melodía descendente triste
+  gameOver() {
+    const notes = [392, 370, 349, 330, 294, 262];
+    notes.forEach((f, i) => {
+      playTone(f, 0.3, 'triangle', 0.2, audioCtx.currentTime + i * 0.15);
+    });
+  },
+
+  // Subir de nivel: fanfarria
+  levelUp() {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((f, i) => {
+      playTone(f, 0.15, 'square', 0.15, audioCtx.currentTime + i * 0.08);
+    });
+  },
+
+  // Desbloquear proyectil: chasquido mágico
+  unlock() {
+    playSlide(400, 1200, 0.3, 'sine', 0.2);
+    playTone(1568, 0.2, 'sine', 0.15, audioCtx.currentTime + 0.2);
+  },
+
+  // Multitud festejando: aplausos (ruido corto)
+  cheer() {
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => playNoise(0.05, 0.08, 2000), i * 50);
+    }
+  },
+
+  // Empezar el juego: acorde ascendente
+  start() {
+    playTone(262, 0.1, 'square', 0.15);  // Do
+    playTone(330, 0.1, 'square', 0.15, audioCtx.currentTime + 0.08);  // Mi
+    playTone(392, 0.15, 'square', 0.15, audioCtx.currentTime + 0.16); // Sol
+    playTone(523, 0.3, 'square', 0.2, audioCtx.currentTime + 0.24);   // Do alto
+  },
+};
+
+// ============ STATE ============
+const state = {
+  playing: false,
+  score: 0,
+  level: 1,
+  combo: 0,
+  comboTimer: 0,
+  popcorn: 20,
+  maxPopcorn: 20,
+  refillTimer: 0,
+  // Proyectil actual seleccionado
+  currentProjectile: 'popcorn',
+  // Munición por tipo: cada proyectil tiene su propio contador
+  ammo: {
+    popcorn: 999,    // palomitas: infinitas
+    cabbage: 0,
+    tomato: 0,
+    potato: 0,
+    watermelon: 0,
+  },
+  // Trump
+  trump: {
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    size: 100,
+    mouthOpen: 0,        // 0..1, 0 = cerrada, 1 = abierta
+    mouthTarget: 0,
+    mouthTimer: 0,
+    mouthInterval: 2.5,  // segundos entre ciclos de boca
+    speechTimer: 0,      // tiempo hablando (boca abierta)
+    speechMax: 6.5,        // tiempo suficiente para leer la frase
+    currentPhrase: '',
+    phraseIdx: 0,
+    bobPhase: 0,         // animación de respiración
+    hitFlash: 0,         // parpadeo al recibir palomita
+    choke: 0,            // animación de atragantamiento
+    // Comida acumulada en el estómago (0..100)
+    foodLevel: 0,        // cuanta más comida, más inflado el abdomen
+    // Estado del pedo
+    fartCharge: 0,       // carga del pedo (0..1), cuando llega a 1 = PEDO
+    farting: 0,          // timer > 0 = está pedándose ahora mismo
+    // Sacudida de pantalla por el pedo
+    screenShake: 0,
+  },
+  // Projectiles
+  popcorns: [],
+  // Effects
+  particles: [],
+  floatingScores: [],
+  // Nubes de gas del pedo
+  fartClouds: [],
+  // Festejo de la multitud (se activa al acertar)
+  crowdCheer: 0,  // timer en segundos; >0 = festejando
+  crowdFaint: 0,   // timer en segundos; >0 = espectadores desmayados/rodando por pedo
+  // Créditos: se pierden cuando Trump dice un diálogo completo. Si llegan a 0 = game over.
+  credits: 3,
+  maxCredits: 3,
+  // Contador de pedos tirados a Trump (al llegar a 5 = Victoria)
+  fartsTriggered: 0,
+  fartsToWin: 5,
+  // Victoria
+  victory: false,
+  // Game over
+  gameOver: false,
+  // Mouse
+  mouseDown: false,
+  mouseX: 0, mouseY: 0,
+  lastThrow: 0,
+  throwInterval: 180, // ms entre palomitas en ráfaga (más lento para no gastar todo)
+};
+
+// ============ PERSONAJES SELECCIONABLES ============
+const CHARACTERS = {
+  trump: {
+    name: 'Trump',
+    emoji: '🇺🇸',
+    // Bandera: EE.UU.
+    flag: 'usa',
+    // Colores del personaje
+    skinColor: '#f4a560',
+    hairColor: '#f7d54a',
+    hairDark: '#d4a843',
+    suitColor: '#1e3a8a',
+    suitDark: '#172554',
+    tieColor: '#dc2626',
+    tieDark: '#991b1b',
+    shirtColor: '#f8f8f8',
+    shoeColor: '#0a0a0a',
+    // Estilo de pelo: 'trump' = mechón horizontal + caracolillo
+    hairStyle: 'trump',
+    // Frases específicas
+    phrases: [
+      "Vamos a construir un muro y México lo va a pagar!",
+      "Covfefe... es todo lo que tengo que decir.",
+      "Hice un llamado, el mejor llamado, llamé a los misiles.",
+      "Nadie tiene más respeto por las mujeres que yo.",
+      "Las noticias falsas son el enemigo del pueblo!",
+      "Tengo el mejor cerebro, los doctores lo dijeron.",
+      "China nos está destruyendo con el comercio, totalmente.",
+      "Hice más por los negros que Abraham Lincoln, créame.",
+      "MAGA, MAGA, MAGA, es lo único que importa.",
+      "Yo soy la persona menos racista que conozcas.",
+    ],
+  },
+  miley: {
+    name: 'Miley',
+    emoji: '🇦🇷',
+    flag: 'argentina',
+    skinColor: '#f5d5b0',
+    hairColor: '#8b6c3f',      // melena color león (marrón dorado)
+    hairDark: '#6b5028',
+    suitColor: '#3a3a3a',      // traje gris oscuro
+    suitDark: '#1a1a1a',
+    tieColor: '#555555',       // sin corbata, pero cinto oscuro
+    tieDark: '#333333',
+    shirtColor: '#d0d0d0',     // camisa gris clara
+    shoeColor: '#1a1a1a',      // zapatos negros
+    hairStyle: 'miley',        // melena de león desprolija
+    phrases: [
+      "Nobody's perfect... pero yo me acerco bastante.",
+      "Vine como un martillo destructivo, baby!",
+      "No puedo parar, no voy a parar, es mi estilo.",
+      "Las reglas no me importan, yo hago lo que quiero.",
+      "Soy una fuerza de la naturaleza, no me detienen.",
+      "Mi voz rompe cristales y corazones, lo sé.",
+      "Puedo comprar cualquier cosa, pero no la felicidad.",
+      "Todos me aman o me odian, no hay punto medio.",
+      "Soy la reina del escenario, del escándalo, de todo.",
+      "Si no te gusta, no me mires. Pero me miras.",
+    ],
+  },
+  netanyahu: {
+    name: 'Netanyahu',
+    emoji: '🇮🇱',
+    flag: 'israel',
+    skinColor: '#e8c4a0',
+    hairColor: '#a0a0a0',
+    hairDark: '#6b6b6b',
+    suitColor: '#1a1a2e',
+    suitDark: '#0d0d1a',
+    tieColor: '#0038b8',  // azul de la bandera de Israel
+    tieDark: '#002a8e',
+    shirtColor: '#f0f0f0',
+    shoeColor: '#1a1a1a',
+    hairStyle: 'bibi',  // pelo canoso peinado hacia atrás
+    phrases: [
+      "Irán no tendrá armas nucleares, jamás, nunca.",
+      "Esta es una amenaza existencial para nuestro pueblo.",
+      "Nadie sabe más de seguridad que yo, créanme.",
+      "Los palestinos no existen como pueblo, fue inventado.",
+      "Tenemos derecho a defendernos con toda nuestra fuerza.",
+      "Hamás son animales, se comportan como animales.",
+      "Jerusalén es nuestra capital por siempre, eternamente.",
+      "Las Naciones Unidas no sirven para nada, son inútiles.",
+      "Hice más por la paz que cualquier otro líder en la historia.",
+      "El mundo nos debe todo, no nos debe juzgar a nosotros.",
+    ],
+  },
+  bolsonaro: {
+    name: 'Bolsonaro',
+    emoji: '🇧🇷',
+    flag: 'brazil',
+    skinColor: '#d4a574',
+    hairColor: '#3a3a3a',
+    hairDark: '#1a1a1a',
+    suitColor: '#1e7a1e',  // verde bandera Brasil
+    suitDark: '#0d4d0d',
+    tieColor: '#ffcc00',  // amarillo bandera Brasil
+    tieDark: '#cc9900',
+    shirtColor: '#f0f0f0',
+    shoeColor: '#1a1a1a',
+    hairStyle: 'bolsonaro',  // mismo estilo que Trump pero marrón
+    phrases: [
+      "Es preferible que un hijo muera a que sea gay.",
+      "Voy a privatizar todo: el agua, el aire, hasta la luz del sol.",
+      "El comunismo es el demonio, el socialismo es el camino del infierno.",
+      "Imbrochável, imbrochável, imbrochável! Nunca van a pararme!",
+      "Las minorías tienen que doblegarse ante la mayoría.",
+      "El Amazonas es nuestro, podemos hacer lo que queramos.",
+      "No voy a dialogar con bandidos, bandidos se matan.",
+      "Si yo fuera dictador, no perdería ni un día.",
+      "La pandemia es una fantasía, el virus es una gripecita.",
+      "Las urnas electrónicas son un fraude, todo fue robado.",
+    ],
+  },
+};
+
+const CHARACTER_KEYS = ['trump', 'miley', 'netanyahu', 'bolsonaro'];
+let currentCharacter = 'trump';
+
+// ============ PHRASES (genéricas, se sobreescriben según personaje) ============
+let PHRASES = CHARACTERS.trump.phrases;
+
+const CHOKE_PHRASES = [
+  "¡Glgblg...!",
+  "¡Ermpf!",
+  "*tose palomitas*",
+  "¡Mmfph!",
+];
+
+// Colores aleatorios para el público (generados una vez, estables por sesión)
+const CROWD_COLORS = [];
+const CROWD_PALETTE = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+  '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+  '#ec4899', '#f43f5e', '#78716c', '#0c0a09',
+];
+function getCrowdColor(i) {
+  if (!CROWD_COLORS[i]) {
+    CROWD_COLORS[i] = CROWD_PALETTE[Math.floor(Math.random() * CROWD_PALETTE.length)];
+  }
+  return CROWD_COLORS[i];
+}
+
+// ============ PROJECTILE TYPES ============
+// Cada proyectil tiene peso, tamaño y daño diferentes.
+// El peso afecta la gravedad (caen más rápido los pesados → arco más cerrado).
+const PROJECTILES = {
+  popcorn: {
+    name: 'Palomita',
+    emoji: '🍿',
+    weight: 1.0,
+    gravity: 0.05,    // casi línea recta (ligera)
+    size: 10,
+    points: 10,
+    color: '#fef3c7',
+  },
+  cabbage: {
+    name: 'Col',
+    emoji: '🥬',
+    weight: 2.5,
+    gravity: 0.20,    // arco más pronunciado
+    size: 14,
+    points: 20,
+    color: '#86efac',
+  },
+  tomato: {
+    name: 'Tomate',
+    emoji: '🍅',
+    weight: 1.8,
+    gravity: 0.15,
+    size: 13,
+    points: 25,
+    color: '#ef4444',
+  },
+  potato: {
+    name: 'Papa',
+    emoji: '🥔',
+    weight: 3.5,
+    gravity: 0.28,    // muy pesada → cae rápido
+    size: 15,
+    points: 30,
+    color: '#d4a574',
+  },
+  watermelon: {
+    name: 'Sandía',
+    emoji: '🍉',
+    weight: 5.0,
+    gravity: 0.42,    // cae casi en picada
+    size: 22,
+    points: 50,
+    color: '#22c55e',
+  },
+};
+const PROJECTILE_KEYS = ['popcorn', 'cabbage', 'tomato', 'potato', 'watermelon'];
+// Proyectil inicial y desbloqueo por nivel
+const UNLOCK_AT_LEVEL = {
+  popcorn: 1,
+  cabbage: 2,
+  tomato: 3,
+  potato: 4,
+  watermelon: 5,
+};
+
+// ============ DRAWING: TRUMP ============
+function drawTrump(t) {
+  // t es state.trump por defecto. Si queremos usar otros valores (menú),
+  // pasamos un objeto temporal con los campos necesarios.
+  const x = t.x;
+  const y = t.y;
+  const s = t.size;
+  const bob = Math.sin(t.bobPhase) * 4;
+  const mouthOpen = t.mouthOpen;
+  const hitFlash = t.hitFlash || 0;
+  const choke = t.choke || 0;
+  // Colores del personaje actual
+  const ch = CHARACTERS[currentCharacter];
+  const C = {
+    skin: ch.skinColor,
+    skinNeck: ch.skinColor,
+    hair: ch.hairColor,
+    hairDark: ch.hairDark,
+    suit: ch.suitColor,
+    suitDark: ch.suitDark,
+    tie: ch.tieColor,
+    tieDark: ch.tieDark,
+    shirt: ch.shirtColor,
+    shoe: ch.shoeColor,
+    hairStyle: ch.hairStyle,
+  };
+  // Animación de brazos: cuando habla, gesticula
+  const armSwing = Math.sin(t.bobPhase * 1.5) * 0.15 + mouthOpen * 0.3;
+
+  ctx.save();
+  ctx.translate(x, y + bob);
+
+  // Hit flash tint
+  if (hitFlash > 0) {
+    ctx.filter = 'brightness(1.6) saturate(1.4)';
+  }
+
+  // ===== PIERNAS (dibujadas primero, detrás del cuerpo) =====
+  // Pantalón del traje (azul marino)
+  ctx.fillStyle = C.suit;
+  // Pierna izquierda
+  ctx.fillRect(-s * 0.25, s * 0.85, s * 0.18, s * 0.45);
+  // Pierna derecha
+  ctx.fillStyle = C.suit;
+  ctx.fillRect(s * 0.07, s * 0.85, s * 0.18, s * 0.45);
+  // Sombra entre piernas
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.fillRect(-s * 0.02, s * 0.85, s * 0.04, s * 0.45);
+
+  // ===== ZAPATOS NEGROS =====
+  ctx.fillStyle = C.shoe;
+  // Zapato izquierdo (ligeramente hacia afuera)
+  ctx.beginPath();
+  ctx.ellipse(-s * 0.16, s * 1.32, s * 0.16, s * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Suela del zapato izquierdo (línea más oscura)
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-s * 0.30, s * 1.30, s * 0.28, s * 0.04);
+  // Zapato derecho
+  ctx.fillStyle = C.shoe;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.16, s * 1.32, s * 0.16, s * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.fillRect(s * 0.02, s * 1.30, s * 0.28, s * 0.04);
+  // Brillo en los zapatos
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.beginPath();
+  ctx.ellipse(-s * 0.18, s * 1.29, s * 0.08, s * 0.025, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(s * 0.14, s * 1.29, s * 0.08, s * 0.025, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ===== BRAZOS (dibujados antes del cuerpo para que el cuerpo tape el hombro) =====
+  // Brazo izquierdo (con animación de gesticulación al hablar)
+  ctx.save();
+  ctx.translate(-s * 0.42, s * 0.35);
+  ctx.rotate(-0.3 + armSwing * 0.5);  // el brazo se mueve al hablar
+  // Manga del traje (azul)
+  ctx.fillStyle = C.suit;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(-s * 0.07, 0, s * 0.14, s * 0.5, s * 0.05) : ctx.rect(-s * 0.07, 0, s * 0.14, s * 0.5);
+  ctx.fill();
+  // Puño blanco de la camisa
+  ctx.fillStyle = C.shirt;
+  ctx.beginPath();
+  ctx.arc(0, s * 0.5, s * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  // Mano (color piel)
+  ctx.fillStyle = C.skin;
+  ctx.beginPath();
+  ctx.arc(0, s * 0.55, s * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+  // Dedos (líneas en la mano)
+  ctx.strokeStyle = '#d49050';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.03, s * 0.52);
+  ctx.lineTo(-s * 0.03, s * 0.58);
+  ctx.moveTo(s * 0.0, s * 0.52);
+  ctx.lineTo(s * 0.0, s * 0.58);
+  ctx.moveTo(s * 0.03, s * 0.52);
+  ctx.lineTo(s * 0.03, s * 0.58);
+  ctx.stroke();
+  ctx.restore();
+
+  // Brazo derecho (con animación de gesticulación al hablar)
+  ctx.save();
+  ctx.translate(s * 0.42, s * 0.35);
+  ctx.rotate(0.3 - armSwing * 0.5);  // el brazo se mueve al hablar (espejo)
+  // Manga del traje
+  ctx.fillStyle = C.suit;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(-s * 0.07, 0, s * 0.14, s * 0.5, s * 0.05) : ctx.rect(-s * 0.07, 0, s * 0.14, s * 0.5);
+  ctx.fill();
+  // Puño blanco
+  ctx.fillStyle = C.shirt;
+  ctx.beginPath();
+  ctx.arc(0, s * 0.5, s * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  // Mano
+  ctx.fillStyle = C.skin;
+  ctx.beginPath();
+  ctx.arc(0, s * 0.55, s * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+  // Dedos
+  ctx.strokeStyle = '#d49050';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.03, s * 0.52);
+  ctx.lineTo(-s * 0.03, s * 0.58);
+  ctx.moveTo(s * 0.0, s * 0.52);
+  ctx.lineTo(s * 0.0, s * 0.58);
+  ctx.moveTo(s * 0.03, s * 0.52);
+  ctx.lineTo(s * 0.03, s * 0.58);
+  ctx.stroke();
+  ctx.restore();
+
+  // ===== CUERPO (traje azul) — se infla con la comida =====
+  // foodLevel 0..100 → abdomen crece hasta 1.8x
+  const foodInflate = 1 + (t.foodLevel || 0) / 100 * 0.8;
+  // Durante el pedo, el abdomen vibra
+  const fartWobble = t.farting > 0 ? Math.sin(t.bobPhase * 20) * 0.05 : 0;
+  const bodyScaleX = foodInflate + fartWobble;
+  const bodyScaleY = foodInflate - fartWobble;
+  ctx.fillStyle = C.suit; // suit color
+  ctx.beginPath();
+  ctx.ellipse(0, s * 0.55, s * 0.5 * bodyScaleX, s * 0.4 * bodyScaleY, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Brillo del abdomen inflado (efecto tenso)
+  if ((t.foodLevel || 0) > 30) {
+    ctx.fillStyle = 'rgba(255, 255, 255, ' + (t.foodLevel / 100) * 0.15 + ')';
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.15, s * 0.45, s * 0.2 * bodyScaleX, s * 0.15 * bodyScaleY, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Solapas del traje (triángulos oscuros)
+  ctx.fillStyle = C.suitDark;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.35, s * 0.3);
+  ctx.lineTo(-s * 0.05, s * 0.55);
+  ctx.lineTo(-s * 0.2, s * 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(s * 0.35, s * 0.3);
+  ctx.lineTo(s * 0.05, s * 0.55);
+  ctx.lineTo(s * 0.2, s * 0.6);
+  ctx.closePath();
+  ctx.fill();
+
+  // White shirt collar
+  ctx.fillStyle = C.shirt;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.2, s * 0.3);
+  ctx.lineTo(0, s * 0.45);
+  ctx.lineTo(s * 0.2, s * 0.3);
+  ctx.lineTo(s * 0.1, s * 0.55);
+  ctx.lineTo(-s * 0.1, s * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  // Red tie (very long, signature)
+  ctx.fillStyle = C.tie;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.04, s * 0.45);
+  ctx.lineTo(s * 0.04, s * 0.45);
+  ctx.lineTo(s * 0.08, s * 0.85);
+  ctx.lineTo(0, s * 0.95);
+  ctx.lineTo(-s * 0.08, s * 0.85);
+  ctx.closePath();
+  ctx.fill();
+  // Nudo de la corbata
+  ctx.fillStyle = C.tieDark;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.05, s * 0.42);
+  ctx.lineTo(s * 0.05, s * 0.42);
+  ctx.lineTo(s * 0.04, s * 0.5);
+  ctx.lineTo(-s * 0.04, s * 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Neck
+  ctx.fillStyle = C.skinNeck;
+  ctx.fillRect(-s * 0.12, s * 0.2, s * 0.24, s * 0.2);
+
+  // ===== CABEZA =====
+  // Head (slightly orange complexion)
+  ctx.fillStyle = C.skin;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 0.35, s * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ===== PELO SEGÚN EL ESTILO DEL PERSONAJE =====
+  if (C.hairStyle === 'trump') {
+    // Trump: elipse vertical lateral + mechón horizontal
+    ctx.fillStyle = C.hair;
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.36, -s * 0.08, s * 0.10, s * 0.22, 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = C.hairDark;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.36, -s * 0.08, s * 0.10, s * 0.22, 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = C.hair;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.34, s * 0.42, s * 0.10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = C.hairDark;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.34, s * 0.42, s * 0.10, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.05, -s * 0.36, s * 0.15, s * 0.035, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (C.hairStyle === 'miley') {
+    // Miley: melena de león desprolija con patillas pronunciadas
+    const hx = 0, hy = -s * 0.3, hr = s * 0.45;
+
+    // 1. Melena redonda con puntas irregulares (solo parte superior y laterales)
+    ctx.fillStyle = C.hair;
+    ctx.beginPath();
+    const numPoints = 24;
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2 - Math.PI / 2;
+      // Patillas: en la zona inferior izquierda y derecha (cerca de angle = 0.3π y 0.7π),
+      // el pelo baja más (patillas pronunciadas)
+      let extra = 0;
+      const normAngle = ((angle + Math.PI * 2.5) % (Math.PI * 2)) - Math.PI / 2;
+      // Patilla izquierda (alrededor de 100°)
+      if (normAngle > 1.5 && normAngle < 2.2) {
+        extra = s * 0.18 * (1 - Math.abs(normAngle - 1.85) / 0.35);
+      }
+      // Patilla derecha (alrededor de -100°)
+      if (normAngle > -2.2 && normAngle < -1.5) {
+        extra = s * 0.18 * (1 - Math.abs(normAngle + 1.85) / 0.35);
+      }
+      // Puntas irregulares en el resto
+      const spike = (i % 2 === 0) ? s * 0.10 : s * 0.03;
+      const r = hr + spike + extra + Math.sin(i * 1.3) * s * 0.02;
+      const px = hx + Math.cos(angle) * r;
+      const py = hy + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Elipse color piel para que se vea la cara (donde no debe haber pelo)
+    ctx.fillStyle = C.skin;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.05 + s * 0.13, s * 0.28, s * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Patillas pronunciadas (2 mechones que bajan a los lados de la cara)
+    ctx.fillStyle = C.hair;
+    // Patilla izquierda
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.32, -s * 0.15);
+    ctx.quadraticCurveTo(-s * 0.38, s * 0.05, -s * 0.3, s * 0.2);
+    ctx.quadraticCurveTo(-s * 0.25, s * 0.1, -s * 0.24, -s * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    // Patilla derecha
+    ctx.beginPath();
+    ctx.moveTo(s * 0.32, -s * 0.15);
+    ctx.quadraticCurveTo(s * 0.38, s * 0.05, s * 0.3, s * 0.2);
+    ctx.quadraticCurveTo(s * 0.25, s * 0.1, s * 0.24, -s * 0.15);
+    ctx.closePath();
+    ctx.fill();
+
+    // 4. Mechones que caen sobre la frente (3 mechones simples)
+    // Mechón izquierdo
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.15, -s * 0.25);
+    ctx.quadraticCurveTo(-s * 0.12, -s * 0.1, -s * 0.08, -s * 0.02);
+    ctx.quadraticCurveTo(-s * 0.06, -s * 0.08, -s * 0.05, -s * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    // Mechón central
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.03, -s * 0.28);
+    ctx.quadraticCurveTo(0, -s * 0.08, s * 0.03, -s * 0.02);
+    ctx.quadraticCurveTo(s * 0.02, -s * 0.08, s * 0.05, -s * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    // Mechón derecho
+    ctx.beginPath();
+    ctx.moveTo(s * 0.08, -s * 0.28);
+    ctx.quadraticCurveTo(s * 0.12, -s * 0.1, s * 0.15, -s * 0.02);
+    ctx.quadraticCurveTo(s * 0.1, -s * 0.08, s * 0.1, -s * 0.28);
+    ctx.closePath();
+    ctx.fill();
+  } else if (C.hairStyle === 'bibi') {
+    // Netanyahu: pelo canoso peinado hacia atrás (sin flequillo)
+    ctx.fillStyle = C.hair;
+    ctx.beginPath();
+    // Capa superior que cubre toda la cabeza hacia atrás
+    ctx.moveTo(-s * 0.35, -s * 0.1);
+    ctx.quadraticCurveTo(-s * 0.4, -s * 0.42, 0, -s * 0.44);
+    ctx.quadraticCurveTo(s * 0.4, -s * 0.42, s * 0.35, -s * 0.1);
+    ctx.lineTo(s * 0.3, -s * 0.05);
+    ctx.quadraticCurveTo(s * 0.2, -s * 0.35, 0, -s * 0.36);
+    ctx.quadraticCurveTo(-s * 0.2, -s * 0.35, -s * 0.3, -s * 0.05);
+    ctx.closePath();
+    ctx.fill();
+    // Líneas de pelo canoso
+    ctx.strokeStyle = C.hairDark;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.25 + i * s * 0.12, -s * 0.38);
+      ctx.lineTo(-s * 0.2 + i * s * 0.12, -s * 0.15);
+      ctx.stroke();
+    }
+  } else if (C.hairStyle === 'bolsonaro') {
+    // Bolsonaro: mismo estilo que Trump (mechón horizontal + caracolillo) pero marrón
+    ctx.fillStyle = C.hair;
+    // Caracolillo lateral (elipse vertical izquierda)
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.36, -s * 0.08, s * 0.10, s * 0.22, 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = C.hairDark;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.36, -s * 0.08, s * 0.10, s * 0.22, 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+    // Mechón horizontal superior
+    ctx.fillStyle = C.hair;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.34, s * 0.42, s * 0.10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = C.hairDark;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.34, s * 0.42, s * 0.10, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // Highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.05, -s * 0.36, s * 0.15, s * 0.035, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Eyebrows (furrowed) — color del pelo oscuro
+  ctx.fillStyle = C.hairDark;
+  ctx.fillRect(-s * 0.2, -s * 0.12, s * 0.12, s * 0.03);
+  ctx.fillRect(s * 0.08, -s * 0.12, s * 0.12, s * 0.03);
+
+  // Eyes (squinting)
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(-s * 0.13, -s * 0.04, s * 0.05, s * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(s * 0.13, -s * 0.04, s * 0.05, s * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupils (looking at mouse)
+  const lookX = clamp((state.mouseX - x) / W * 4, -1, 1) * s * 0.02;
+  const lookY = clamp((state.mouseY - y) / H * 4, -1, 1) * s * 0.02;
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(-s * 0.13 + lookX, -s * 0.04 + lookY, s * 0.02, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(s * 0.13 + lookX, -s * 0.04 + lookY, s * 0.02, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mouth (opens based on trump.mouthOpen)
+  const openAmount = mouthOpen;
+  const mouthW = s * 0.22;
+  const mouthH = s * 0.04 + s * 0.16 * openAmount;
+  const mouthY = s * 0.12;
+
+  // Si está siendo impactado (choke > 0), dibujar boca como V invertida (Λ)
+  // — punta arriba, lados abiertos hacia abajo, como grito de dolor/asombro
+  if (choke > 0) {
+    const intensity = Math.min(choke, 1);
+    const peakY = mouthY - mouthH * 1.5 * intensity;  // punta hacia arriba
+    const baseLeftY = mouthY + mouthH * 0.8;
+    const baseRightY = mouthY + mouthH * 0.8;
+    // Interior oscuro (como una Λ rellena)
+    ctx.fillStyle = '#7f1d1d';
+    ctx.beginPath();
+    ctx.moveTo(-mouthW, baseLeftY);
+    ctx.lineTo(0, peakY);
+    ctx.lineTo(mouthW, baseRightY);
+    ctx.lineTo(mouthW * 0.5, mouthY + mouthH * 0.3);
+    ctx.lineTo(-mouthW * 0.5, mouthY + mouthH * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    // Dientes superiores en la punta
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(-mouthW * 0.3, mouthY - mouthH * 0.2);
+    ctx.lineTo(0, peakY + mouthH * 0.5);
+    ctx.lineTo(mouthW * 0.3, mouthY - mouthH * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    // Contorno de la Λ
+    ctx.strokeStyle = '#a83232';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-mouthW, baseLeftY);
+    ctx.lineTo(0, peakY);
+    ctx.lineTo(mouthW, baseRightY);
+    ctx.stroke();
+    // Línea inferior (la parte abierta abajo)
+    ctx.beginPath();
+    ctx.moveTo(-mouthW, baseLeftY);
+    ctx.quadraticCurveTo(0, mouthY + mouthH * 0.5, mouthW, baseRightY);
+    ctx.stroke();
+  } else if (openAmount > 0.05) {
+    // Boca normal abierta (elipse)
+    ctx.fillStyle = '#7f1d1d';
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY, mouthW, mouthH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Teeth (top row)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY - mouthH * 0.5, mouthW * 0.9, mouthH * 0.3, 0, 0, Math.PI);
+    ctx.fill();
+
+    // Lower lip / teeth
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY + mouthH * 0.5, mouthW * 0.85, mouthH * 0.25, 0, Math.PI, 2 * Math.PI);
+    ctx.fill();
+
+    // Tongue if very open
+    if (openAmount > 0.5) {
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.ellipse(0, mouthY + mouthH * 0.3, mouthW * 0.6, mouthH * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Lips
+    ctx.strokeStyle = '#a83232';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY, mouthW, Math.max(mouthH, s * 0.04), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // Boca cerrada
+    ctx.strokeStyle = '#a83232';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY, mouthW, s * 0.04, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Choke effect (X eyes when choking)
+  if (choke > 0) {
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.18, -s * 0.08); ctx.lineTo(-s * 0.08, -s * 0.0);
+    ctx.moveTo(-s * 0.18, -s * 0.0); ctx.lineTo(-s * 0.08, -s * 0.08);
+    ctx.moveTo(s * 0.08, -s * 0.08); ctx.lineTo(s * 0.18, -s * 0.0);
+    ctx.moveTo(s * 0.08, -s * 0.0); ctx.lineTo(s * 0.18, -s * 0.08);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // Reset filter
+  ctx.filter = 'none';
+}
+
+// ============ DRAWING: POPCORN ============
+function drawPopcorn(p) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rotation);
+
+  const type = p.type || 'popcorn';
+  const s = p.size;
+
+  // Shadow (común a todos)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(2, 3, s * 0.9, s * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (type === 'popcorn') {
+    // Popcorn: blanco/amarillo con bultos
+    ctx.fillStyle = '#fef3c7';
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      ctx.arc(Math.cos(angle) * s * 0.3, Math.sin(angle) * s * 0.3, s * 0.45, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    // Manchas de mantequilla
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(-s * 0.2, -s * 0.1, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s * 0.25, s * 0.15, s * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 'cabbage') {
+    // Col: verde redonda con vetas
+    ctx.fillStyle = '#86efac';
+    ctx.beginPath();
+    ctx.arc(0, 0, s, 0, Math.PI * 2);
+    ctx.fill();
+    // Capas externas más oscuras
+    ctx.strokeStyle = '#16a34a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, s, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    // Veta central
+    ctx.strokeStyle = '#15803d';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.lineTo(0, s);
+    ctx.stroke();
+  } else if (type === 'tomato') {
+    // Tomate: rojo redondo con tallito verde
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.arc(0, 0, s, 0, Math.PI * 2);
+    ctx.fill();
+    // Brillo
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.3, -s * 0.3, s * 0.25, s * 0.15, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Tallito verde arriba
+    ctx.fillStyle = '#16a34a';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, -s * 0.8);
+    ctx.lineTo(0, -s * 1.2);
+    ctx.lineTo(s * 0.3, -s * 0.8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#15803d';
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.85, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 'potato') {
+    // Papa: marrón ovalada con manchas
+    ctx.fillStyle = '#d4a574';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s * 1.1, s * 0.85, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Manchas (ojos)
+    ctx.fillStyle = '#92400e';
+    ctx.beginPath();
+    ctx.arc(-s * 0.3, -s * 0.1, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s * 0.2, s * 0.2, s * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(s * 0.4, -s * 0.3, s * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    // Sombra inferior
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.4, s * 0.9, s * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 'watermelon') {
+    // Sandía: grande verde con rayas
+    ctx.fillStyle = '#16a34a';
+    ctx.beginPath();
+    ctx.arc(0, 0, s, 0, Math.PI * 2);
+    ctx.fill();
+    // Rayas más oscuras
+    ctx.strokeStyle = '#14532d';
+    ctx.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.4, s * 0.95, i * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Brillo
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.3, -s * 0.3, s * 0.25, s * 0.18, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ============ DIBUJAR BANDERA SEGÚN EL PERSONAJE ============
+function drawFlag(flagType, fx, fy, fw, fh) {
+  if (flagType === 'usa') {
+    // Bandera de EE.UU.: 13 franjas + cantón azul con estrellas
+    const stripeH = fh / 13;
+    const unionW = fw * 0.4;
+    const unionH = stripeH * 7;
+    for (let i = 0; i < 13; i++) {
+      ctx.fillStyle = (i % 2 === 0) ? '#b91c1c' : '#ffffff';
+      ctx.fillRect(fx, fy + i * stripeH, fw, stripeH);
+    }
+    ctx.fillStyle = '#1e3a8a';
+    ctx.fillRect(fx, fy, unionW, unionH);
+    ctx.fillStyle = '#ffffff';
+    const starSize = Math.min(unionW, unionH) / 14;
+    for (let row = 0; row < 9; row++) {
+      const cols = (row % 2 === 0) ? 11 : 10;
+      const xOff = (row % 2 === 0) ? unionW / 12 : unionW / 12 * 1.5;
+      for (let col = 0; col < cols; col++) {
+        drawStar(fx + xOff + col * (unionW / 12), fy + (unionH / 10) * (row + 1), starSize * 0.6, starSize * 0.3, 5);
+      }
+    }
+  } else if (flagType === 'rainbow') {
+    // Bandera arcoíris: 6 franjas de colores
+    const rainbowColors = ['#e40303', '#ff8c00', '#ffed00', '#008026', '#004dff', '#750787'];
+    const stripeH = fh / rainbowColors.length;
+    for (let i = 0; i < rainbowColors.length; i++) {
+      ctx.fillStyle = rainbowColors[i];
+      ctx.fillRect(fx, fy + i * stripeH, fw, stripeH);
+    }
+  } else if (flagType === 'israel') {
+    // Bandera de Israel: fondo blanco con dos franjas azules horizontales y estrella de David
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(fx, fy, fw, fh);
+    // Franjas azules
+    ctx.fillStyle = '#0038b8';
+    ctx.fillRect(fx, fy + fh * 0.12, fw, fh * 0.1);
+    ctx.fillRect(fx, fy + fh * 0.78, fw, fh * 0.1);
+    // Estrella de David (dos triángulos superpuestos) en el centro
+    const cx = fx + fw / 2;
+    const cy = fy + fh / 2;
+    const starR = Math.min(fw, fh) * 0.18;
+    ctx.strokeStyle = '#0038b8';
+    ctx.lineWidth = 4;
+    // Triángulo hacia arriba
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - starR);
+    ctx.lineTo(cx - starR * 0.866, cy + starR * 0.5);
+    ctx.lineTo(cx + starR * 0.866, cy + starR * 0.5);
+    ctx.closePath();
+    ctx.stroke();
+    // Triángulo hacia abajo
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + starR);
+    ctx.lineTo(cx - starR * 0.866, cy - starR * 0.5);
+    ctx.lineTo(cx + starR * 0.866, cy - starR * 0.5);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (flagType === 'brazil') {
+    // Bandera de Brasil: verde, rombo amarillo, círculo azul, franja blanca
+    ctx.fillStyle = '#009c3b';
+    ctx.fillRect(fx, fy, fw, fh);
+    // Rombo amarillo
+    ctx.fillStyle = '#ffdf00';
+    ctx.beginPath();
+    ctx.moveTo(fx + fw / 2, fy + fh * 0.1);
+    ctx.lineTo(fx + fw * 0.92, fy + fh / 2);
+    ctx.lineTo(fx + fw / 2, fy + fh * 0.9);
+    ctx.lineTo(fx + fw * 0.08, fy + fh / 2);
+    ctx.closePath();
+    ctx.fill();
+    // Círculo azul
+    ctx.fillStyle = '#002776';
+    ctx.beginPath();
+    ctx.arc(fx + fw / 2, fy + fh / 2, Math.min(fw, fh) * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Franja blanca curva
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(fx + fw / 2, fy + fh * 0.7, Math.min(fw, fh) * 0.35, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  } else if (flagType === 'argentina') {
+    // Bandera de Argentina: 3 franjas horizontales (celeste, blanca, celeste)
+    // con sol de mayo en el centro
+    const stripeH = fh / 3;
+    // Franja celeste superior
+    ctx.fillStyle = '#75aadb';
+    ctx.fillRect(fx, fy, fw, stripeH);
+    // Franja blanca central
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(fx, fy + stripeH, fw, stripeH);
+    // Franja celeste inferior
+    ctx.fillStyle = '#75aadb';
+    ctx.fillRect(fx, fy + stripeH * 2, fw, stripeH);
+    // Sol de mayo en el centro de la franja blanca
+    const sunCX = fx + fw / 2;
+    const sunCY = fy + stripeH * 1.5;
+    const sunR = Math.min(fw, fh) * 0.12;
+    // Sol: círculo dorado
+    ctx.fillStyle = '#f5c842';
+    ctx.beginPath();
+    ctx.arc(sunCX, sunCY, sunR * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Rayos del sol (12 rayos alternados largos y cortos)
+    ctx.fillStyle = '#f5c842';
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2;
+      const isLong = i % 2 === 0;
+      const rayLen = isLong ? sunR * 0.8 : sunR * 0.5;
+      const innerR = sunR * 0.45;
+      const outerR = innerR + rayLen;
+      const perpAngle = angle + Math.PI / 2;
+      const w = isLong ? sunR * 0.08 : sunR * 0.06;
+      ctx.beginPath();
+      ctx.moveTo(sunCX + Math.cos(angle) * innerR + Math.cos(perpAngle) * w,
+                 sunCY + Math.sin(angle) * innerR + Math.sin(perpAngle) * w);
+      ctx.lineTo(sunCX + Math.cos(angle) * outerR, sunCY + Math.sin(angle) * outerR);
+      ctx.lineTo(sunCX + Math.cos(angle) * innerR - Math.cos(perpAngle) * w,
+                 sunCY + Math.sin(angle) * innerR - Math.sin(perpAngle) * w);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Rostro del sol (semicírculo con ojos y boca)
+    ctx.fillStyle = '#e8a82c';
+    ctx.beginPath();
+    ctx.arc(sunCX, sunCY, sunR * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+    // Ojos
+    ctx.fillStyle = '#5a3a00';
+    ctx.beginPath();
+    ctx.arc(sunCX - sunR * 0.12, sunCY - sunR * 0.05, sunR * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(sunCX + sunR * 0.12, sunCY - sunR * 0.05, sunR * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    // Boca
+    ctx.beginPath();
+    ctx.arc(sunCX, sunCY + sunR * 0.05, sunR * 0.08, 0, Math.PI);
+    ctx.stroke();
+  }
+}
+
+// ============ DRAWING: BACKGROUND ============
+function drawBackground() {
+  // ===== ESCENARIO EN PERSPECTIVA =====
+  const horizonY = H * 0.55;
+  const flagW = W * 0.7;
+  const flagH = horizonY * 0.85;
+  const flagX = (W - flagW) / 2;
+  const flagY = horizonY * 0.08;
+
+  // Fondo de la pared (azul oscuro)
+  ctx.fillStyle = '#0c1e4a';
+  ctx.fillRect(0, 0, W, horizonY);
+
+  // ===== BANDERA SEGÚN EL PERSONAJE =====
+  drawFlag(CHARACTERS[currentCharacter].flag, flagX, flagY, flagW, flagH);
+
+  // Marco dorado de la bandera
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(flagX, flagY, flagW, flagH);
+
+  // ===== SUELO EN PERSPECTIVA =====
+  // El suelo es un trapecio: estrecho arriba (en el horizonte), ancho abajo (en el borde inferior).
+  // Punto de fuga: centro del horizonte
+  const vanishX = W / 2;
+  const vanishY = horizonY;
+  // Bordes del suelo en el horizonte (estrecho)
+  const topLeft = vanishX - W * 0.05;
+  const topRight = vanishX + W * 0.05;
+  // Bordes del suelo abajo (ancho)
+  const botLeft = -W * 0.1;   // se sale un poco de la pantalla para dar efecto
+  const botRight = W * 1.1;
+
+  // Degradado del suelo (más oscuro lejos, más claro cerca)
+  const floorGrad = ctx.createLinearGradient(0, horizonY, 0, H);
+  floorGrad.addColorStop(0, '#5c1a0a');
+  floorGrad.addColorStop(0.5, '#7c2d12');
+  floorGrad.addColorStop(1, '#9a3a18');
+  ctx.fillStyle = floorGrad;
+  ctx.beginPath();
+  ctx.moveTo(topLeft, vanishY);
+  ctx.lineTo(topRight, vanishY);
+  ctx.lineTo(botRight, H);
+  ctx.lineTo(botLeft, H);
+  ctx.closePath();
+  ctx.fill();
+
+  // ===== LÍNEAS DE FUGA DEL SUELO (perspectiva) =====
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.lineWidth = 1.5;
+  // Líneas que convergen al punto de fuga
+  const numLines = 12;
+  for (let i = 0; i <= numLines; i++) {
+    const t = i / numLines;
+    const xBottom = botLeft + t * (botRight - botLeft);
+    ctx.beginPath();
+    ctx.moveTo(xBottom, H);
+    ctx.lineTo(vanishX, vanishY);
+    ctx.stroke();
+  }
+
+  // Líneas horizontales (transversales) que se juntan hacia el horizonte
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 8; i++) {
+    const t = i / 8;
+    // Interpolación no lineal para dar efecto de perspectiva (más juntas cerca del horizonte)
+    const persp = Math.pow(t, 2);
+    const y = vanishY + persp * (H - vanishY);
+    const widthAtY = (botRight - botLeft) * persp + (topRight - topLeft) * (1 - persp);
+    const xCenter = W / 2;
+    ctx.beginPath();
+    ctx.moveTo(xCenter - widthAtY / 2, y);
+    ctx.lineTo(xCenter + widthAtY / 2, y);
+    ctx.stroke();
+  }
+
+  // ===== LÍNEA DE HORIZONTE (borde entre pared y suelo) =====
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, horizonY);
+  ctx.lineTo(W, horizonY);
+  ctx.stroke();
+  // Sombra bajo el horizonte
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillRect(0, horizonY, W, 6);
+
+  // ===== TRIBUNA / PODIO (donde está la multitud, a los lados del suelo) =====
+  // Tribuna izquierda
+  ctx.fillStyle = '#3a1a08';
+  ctx.beginPath();
+  ctx.moveTo(0, horizonY);
+  ctx.lineTo(topLeft, vanishY);
+  ctx.lineTo(botLeft, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fill();
+  // Tribuna derecha
+  ctx.beginPath();
+  ctx.moveTo(W, horizonY);
+  ctx.lineTo(topRight, vanishY);
+  ctx.lineTo(botRight, H);
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+
+  // ===== RECTÁNGULO AZUL QUE TAPA EL PUNTO DE FUGA =====
+  // Se dibuja DESPUÉS de las tribunas para que tape todo el ancho de la pantalla.
+  // Ancho completo, desde el horizonte hacia abajo, hasta justo por encima de la multitud.
+  const coverH = (H - horizonY) * 0.28;
+  const coverGrad = ctx.createLinearGradient(0, horizonY, 0, horizonY + coverH);
+  coverGrad.addColorStop(0, '#0c1e4a');
+  coverGrad.addColorStop(0.5, '#16103a');
+  coverGrad.addColorStop(1, '#3a1a08');
+  ctx.fillStyle = coverGrad;
+  ctx.fillRect(0, horizonY, W, coverH);
+
+  // ===== MULTITUD DETRÁS DE TRUMP (centro, filas escalonadas) =====
+  // Muchas más personas en varias filas detrás de donde se mueve Trump
+  const cheer = state.crowdCheer > 0 ? state.crowdCheer : 0;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+
+  // Función helper para dibujar un espectador
+  function drawSpectator(cx, cy, scale, cheer, i, side) {
+    const color = getCrowdColor(i + side * 100);
+    const faint = state.crowdFaint > 0 ? state.crowdFaint : 0;
+
+    if (faint > 0) {
+      // ===== MODO DESMAYO: tirado en el piso, rodando =====
+      // El espectador está acostado, rodando de lado
+      const rollAngle = faint * 6 + i * 1.5;  // cada uno rueda a diferente velocidad
+      const rollX = cx + Math.sin(rollAngle) * 15 * scale;  // se desplaza de lado
+      const rollY = cy + 20 * scale;  // tirado en el piso (más abajo)
+      // Rotación del cuerpo
+      ctx.save();
+      ctx.translate(rollX, rollY);
+      ctx.rotate(Math.sin(rollAngle) * 0.8);  // cuerpo rotando
+      // Cuerpo horizontal (acostado)
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 14 * scale, 6 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Cabeza (a un lado del cuerpo)
+      ctx.beginPath();
+      ctx.arc(-14 * scale, 0, 7 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      // X en los ojos (desmayado)
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5 * scale;
+      ctx.beginPath();
+      ctx.moveTo(-16 * scale, -2 * scale); ctx.lineTo(-13 * scale, 1 * scale);
+      ctx.moveTo(-16 * scale, 1 * scale); ctx.lineTo(-13 * scale, -2 * scale);
+      ctx.stroke();
+      // Brazos extendidos (caídos)
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.moveTo(5 * scale, -3 * scale);
+      ctx.lineTo(15 * scale, -8 * scale);
+      ctx.moveTo(5 * scale, 3 * scale);
+      ctx.lineTo(18 * scale, 5 * scale);
+      ctx.stroke();
+      // Piernas extendidas
+      ctx.beginPath();
+      ctx.moveTo(12 * scale, 0);
+      ctx.lineTo(22 * scale, -3 * scale);
+      ctx.moveTo(12 * scale, 0);
+      ctx.lineTo(22 * scale, 4 * scale);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      // ===== MODO NORMAL: de pie, festejando =====
+      const jumpOffset = cheer > 0 ? Math.sin(cheer * 12 + i * 0.8 + side) * 10 * scale : 0;
+      const fy = cy - jumpOffset;
+      const armPhase = Math.sin(state.trump.bobPhase * 0.5 + i + side) * 0.4;
+      const cheerBoost = cheer > 0 ? 25 * scale : 0;
+      // Cabeza
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, fy, 9 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      // Cuerpo
+      ctx.fillRect(cx - 6 * scale, fy + 5 * scale, 12 * scale, 28 * scale);
+      // Brazo principal
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(cx + (side ? -7 : 7) * scale, fy + 10 * scale);
+      ctx.lineTo(cx + (side ? -16 : 16) * scale, fy - 10 * scale + armPhase * 8 - cheerBoost);
+      ctx.lineWidth = 3.5 * scale;
+      ctx.stroke();
+      // Segundo brazo al festejar
+      if (cheer > 0) {
+        ctx.beginPath();
+        ctx.moveTo(cx + (side ? 7 : -7) * scale, fy + 10 * scale);
+        ctx.lineTo(cx + (side ? 16 : -16) * scale, fy - 10 * scale - armPhase * 8 - cheerBoost * 0.7);
+        ctx.lineWidth = 3.5 * scale;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // --- Multitud DETRÁS de Trump (centro, filas escalonadas en profundidad) ---
+  // 3 filas detrás de Trump, cada una más pequeña (perspectiva)
+  const trumpAreaCenter = W / 2;
+  const trumpAreaW = W * 0.35;
+  for (let row = 0; row < 3; row++) {
+    const rowT = row / 3;
+    const rowY = horizonY + 8 + rowT * (H - horizonY) * 0.12;
+    const rowScale = 0.45 + rowT * 0.35;  // más chicos los de atrás
+    const numInRow = 8 - row;  // 8, 7, 6 personas por fila
+    for (let j = 0; j < numInRow; j++) {
+      const jt = (j + 0.5) / numInRow;
+      const cx = trumpAreaCenter - trumpAreaW / 2 + jt * trumpAreaW;
+      drawSpectator(cx, rowY, rowScale, cheer, j + row * 10, 0);
+    }
+  }
+
+  // --- Multitud en las tribunas laterales (las originales, mejoradas) ---
+  // Izquierda: más filas
+  const sideY = horizonY + (H - horizonY) * 0.22;
+  for (let i = 0; i < 14; i++) {  // aumentado de 10 a 14
+    const t = i / 14;
+    const cx = 5 + t * (topLeft - 10);
+    drawSpectator(cx, sideY, 1.0, cheer, i, 0);
+  }
+  // Derecha: más filas
+  for (let i = 0; i < 14; i++) {
+    const t = i / 14;
+    const cx = W - 5 - t * (W - topRight - 10);
+    drawSpectator(cx, sideY, 1.0, cheer, i + 20, 1);
+  }
+
+  // --- Segunda fila de multitud lateral (más cerca, más grande) ---
+  const sideY2 = horizonY + (H - horizonY) * 0.42;
+  for (let i = 0; i < 8; i++) {
+    const t = i / 8;
+    const cx = 15 + t * (topLeft - 20);
+    drawSpectator(cx, sideY2, 1.3, cheer, i + 40, 0);
+  }
+  for (let i = 0; i < 8; i++) {
+    const t = i / 8;
+    const cx = W - 15 - t * (W - topRight - 20);
+    drawSpectator(cx, sideY2, 1.3, cheer, i + 50, 1);
+  }
+
+  // Confeti / partículas de festejo
+  if (cheer > 0) {
+    for (let i = 0; i < 8; i++) {
+      const fx = Math.random() * W;
+      const fy = horizonY + Math.random() * (H - horizonY) * 0.4;
+      const colors = ['#fbbf24', '#22c55e', '#ef4444', '#3b82f6', '#a855f7', '#ec4899'];
+      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+      ctx.globalAlpha = cheer;
+      ctx.fillRect(fx, fy, 4, 4);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Dibuja una estrella de N puntas en (cx, cy)
+function drawStar(cx, cy, outerR, innerR, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = (i % 2 === 0) ? outerR : innerR;
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ============ HELPERS ============
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+// ============ GAME LOGIC ============
+function startGame() {
+  initAudio();
+  SFX.start();
+  // Cargar las frases del personaje seleccionado
+  PHRASES = CHARACTERS[currentCharacter].phrases;
+  state.playing = true;
+  state.gameOver = false;
+  state.score = 0;
+  state.level = 1;
+  state.combo = 0;
+  state.comboTimer = 0;
+  state.popcorn = state.maxPopcorn;
+  state.popcorns = [];
+  state.particles = [];
+  state.floatingScores = [];
+
+  // Reset proyectiles y munición
+  state.currentProjectile = 'popcorn';
+  state.ammo = { popcorn: 999, cabbage: 0, tomato: 0, potato: 0, watermelon: 0 };
+
+  state.trump.x = W / 2;
+  state.trump.y = H * 0.68;
+  state.trump.vx = 0;
+  state.trump.vy = 0;
+  state.trump.mouthOpen = 0;
+  state.trump.mouthTarget = 0;
+  state.trump.mouthTimer = 1.5;
+  state.trump.mouthInterval = 2.5;
+  state.trump.speechMax = 6.5;
+  state.trump.moveSpeed = 1;  // velocidad base de movimiento
+  state.trump.speechTimer = 0;
+  state.trump.currentPhrase = '';
+  state.trump.hitFlash = 0;
+  state.trump.choke = 0;
+  state.trump.foodLevel = 0;
+  state.trump.farting = 0;
+  state.trump.screenShake = 0;
+  state.fartClouds = [];
+  state.credits = state.maxCredits;
+  state.fartsTriggered = 0;
+  state.victory = false;
+
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('game-over').classList.remove('show');
+  document.getElementById('combo-panel').classList.add('hidden');
+  updateHUD();
+}
+
+function endGame() {
+  SFX.gameOver();
+  state.playing = false;
+  state.gameOver = true;
+  state.victory = false;
+  document.getElementById('game-over-title').textContent = '¡SE ATROGANÓ!';
+  document.getElementById('final-score').textContent = state.score;
+  document.getElementById('game-over').classList.add('show');
+}
+
+function triggerVictory() {
+  SFX.levelUp();
+  state.playing = false;
+  state.gameOver = true;
+  state.victory = true;
+  document.getElementById('game-over-title').textContent = '¡VICTORIA! 🎉';
+  document.getElementById('final-score').textContent = state.score;
+  document.getElementById('game-over').classList.add('show');
+}
+
+function throwPopcorn(tx, ty) {
+  const ptype = PROJECTILES[state.currentProjectile];
+  // Para palomitas usamos state.popcorn, para las otras usamos ammo[type]
+  if (state.currentProjectile === 'popcorn') {
+    if (state.popcorn <= 0) return;
+    state.popcorn--;
+  } else {
+    if ((state.ammo[state.currentProjectile] || 0) <= 0) {
+      // Sin munición de este tipo, volver a palomitas automáticamente
+      state.currentProjectile = 'popcorn';
+      updateProjectileSelector();
+      return;
+    }
+    state.ammo[state.currentProjectile]--;
+  }
+  state.refillTimer = 0;
+
+  // Spawn from bottom of screen (near the player)
+  const startX = W / 2 + (Math.random() - 0.5) * 80;
+  const startY = H - 30;
+
+  // Trayectoria: lanzamiento parabólico según el peso del proyectil.
+  // Los proyectiles pesados (sandía, papa) caen más rápido → arco más cerrado.
+  // Los ligeros (palomita, tomate) vuelan más recto.
+  const dx = tx - startX;
+  const dy = ty - startY;
+  const dist = Math.hypot(dx, dy);
+  // Velocidad inicial: las cosas pesadas salen más lento
+  const baseSpeed = 22 - ptype.weight * 2.2;
+  const speed = Math.max(8, baseSpeed);
+  const vx = (dx / dist) * speed;
+  // Para crear el arco: disparamos un poco más arriba del objetivo (vy inicial negativa)
+  // y luego la gravedad lo hace caer. Cuanto más pesado, más arco.
+  const vy = (dy / dist) * speed - ptype.weight * 1.2;
+
+  state.popcorns.push({
+    type: state.currentProjectile,
+    x: startX,
+    y: startY,
+    vx: vx,
+    vy: vy,
+    gravity: ptype.gravity,
+    size: ptype.size,
+    rotation: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * (0.4 / Math.sqrt(ptype.weight)),
+    life: 2.0,
+    seed: Math.random() * 1000,
+  });
+  SFX.throw();
+}
+
+function updatePopcorns(dt) {
+  for (let i = state.popcorns.length - 1; i >= 0; i--) {
+    const p = state.popcorns[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += p.gravity;
+    p.rotation += p.rotSpeed;
+    p.life -= dt;
+
+    // Check collision with Trump
+    const trump = state.trump;
+    const dx = p.x - trump.x;
+    const dy = p.y - trump.y;
+    const d = Math.hypot(dx, dy);
+
+    if (d < trump.size * 0.5) {
+      // Check if it hits the mouth — hitbox más generoso
+      const mouthY = trump.y + trump.size * 0.12;
+      const mouthDx = Math.abs(p.x - trump.x);
+      const mouthDy = Math.abs(p.y - mouthY);
+      const mouthW = trump.size * 0.35;  // hitbox más ancho
+      const mouthH = trump.size * 0.20;   // hitbox más alto
+
+      if (mouthDx < mouthW && mouthDy < mouthH && trump.mouthOpen > 0.25) {
+        // HIT! Mouth was open
+        scoreHit(p.x, p.y, true, p.type);
+        SFX.hit();
+        spawnParticles(p.x, p.y, '#fbbf24', 8);
+        state.popcorns.splice(i, 1);
+        continue;
+      } else if (mouthDx < mouthW && mouthDy < mouthH && trump.mouthOpen <= 0.25) {
+        // Hit mouth area but mouth was closed — bounce off
+        p.vy = -Math.abs(p.vy) * 0.5;
+        p.vx = (Math.random() - 0.5) * 4;
+        SFX.bounce();
+        spawnParticles(p.x, p.y, '#888', 4);
+      } else if (d < trump.size * 0.32) {
+        // Hit face — bounce off
+        const angle = Math.atan2(dy, dx);
+        p.vx = Math.cos(angle) * 4;
+        p.vy = Math.sin(angle) * 4;
+        SFX.bounce();
+        spawnParticles(p.x, p.y, '#f4a560', 4);
+      }
+    }
+
+    // Out of bounds
+    if (p.y > H + 50 || p.x < -50 || p.x > W + 50 || p.life <= 0) {
+      state.popcorns.splice(i, 1);
+    }
+  }
+}
+
+function scoreHit(x, y, isHit, projectileType) {
+  if (isHit) {
+    state.combo++;
+    state.comboTimer = 2;
+    // Puntos según el tipo de proyectil (las cosas pesadas dan más)
+    const ptype = PROJECTILES[projectileType || 'popcorn'];
+    const comboMultiplier = Math.min(state.combo, 5);
+    const points = ptype.points * comboMultiplier;
+    state.score += points;
+
+    // Trump chokes / interrupts speech
+    state.trump.speechTimer = 0;
+    state.trump.mouthTarget = 0;
+    state.trump.hitFlash = 0.2;
+    // Cosas más pesadas causan más atragantamiento
+    state.trump.choke = 0.4 + ptype.weight * 0.15;
+    state.trump.mouthTimer = state.trump.mouthInterval;
+
+    // ===== ACUMULAR COMIDA EN EL ESTÓMAGO =====
+    // Cada acierto suma comida según el peso del proyectil.
+    // Cuando llega al máximo, Trump suelta un PEDO ENORME.
+    const foodGain = ptype.weight * 3;  // palomita=3, col=7.5, tomate=5.4, papa=10.5, sandía=15
+    state.trump.foodLevel = Math.min(100, state.trump.foodLevel + foodGain);
+
+    // Si llega al 100%, ¡PEDO!
+    if (state.trump.foodLevel >= 100 && state.trump.farting <= 0) {
+      triggerFart();
+    }
+
+    showFloatingScore(x, y, '+' + points);
+    // ¡La multitud festeja!
+    state.crowdCheer = 1.2;  // 1.2 segundos de festejo
+    SFX.cheer();
+    showChokePhrase(x, y);
+
+    // Level up cada 100 puntos
+    if (state.score >= state.level * 100) {
+      state.level++;
+      SFX.levelUp();
+      // Trump habla más rápido (boca se abre más frecuente)
+      state.trump.mouthInterval = Math.max(0.8, state.trump.mouthInterval - 0.25);
+      // Trump se mueve más rápido
+      state.trump.moveSpeed = Math.min(2.0, (state.trump.moveSpeed || 1) * 1.15);
+      // Tiempo máximo de frase se reduce (hay que ser más rápido)
+      state.trump.speechMax = Math.max(4.0, state.trump.speechMax - 0.2);
+      // Desbloquear proyectiles según el nivel
+      checkProjectileUnlock();
+      showFloatingScore(W / 2, H * 0.3, '¡NIVEL ' + state.level + '!');
+    }
+
+    // Recargar palomitas al acertar
+    state.popcorn = Math.min(state.maxPopcorn, state.popcorn + 1);
+    // Acierto con proyectil especial: ganar munición de ese tipo
+    if (projectileType && projectileType !== 'popcorn') {
+      // 25% de chance de ganar una munición del mismo tipo
+      if (Math.random() < 0.25) {
+        state.ammo[projectileType] = (state.ammo[projectileType] || 0) + 1;
+      }
+    }
+
+    if (state.combo >= 3) {
+      document.getElementById('combo-panel').classList.remove('hidden');
+      document.getElementById('combo').textContent = 'x' + state.combo;
+    }
+  } else {
+    state.combo = 0;
+    document.getElementById('combo-panel').classList.add('hidden');
+  }
+  updateHUD();
+}
+
+function showFloatingScore(x, y, text) {
+  const el = document.createElement('div');
+  el.className = 'floating-score';
+  el.textContent = text;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.getElementById('game-container').appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+function showChokePhrase(x, y) {
+  const bubble = document.getElementById('speech-bubble');
+  const phrase = CHOKE_PHRASES[Math.floor(Math.random() * CHOKE_PHRASES.length)];
+  bubble.textContent = phrase;
+  bubble.style.left = (x - 80) + 'px';
+  bubble.style.top = (y - 80) + 'px';
+  bubble.classList.add('visible');
+  setTimeout(() => bubble.classList.remove('visible'), 800);
+}
+
+function showSpeechBubble(text) {
+  const bubble = document.getElementById('speech-bubble');
+  bubble.textContent = text;
+  const trump = state.trump;
+  bubble.style.left = (trump.x - 100) + 'px';
+  bubble.style.top = (trump.y - trump.size - 60) + 'px';
+  bubble.classList.add('visible');
+}
+
+function hideSpeechBubble() {
+  document.getElementById('speech-bubble').classList.remove('visible');
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 4;
+    state.particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 3,
+      color,
+      life: 0.6 + Math.random() * 0.4,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.2;
+    p.life -= dt;
+    if (p.life <= 0) state.particles.splice(i, 1);
+  }
+}
+
+function updateTrump(dt) {
+  const t = state.trump;
+  // bobPhase ya se actualiza en el loop principal
+
+  // Move trump smoothly around the screen — LENTO para que sea apuntable
+  // Wander pattern: change target every few seconds
+  if (!t.targetX || Math.abs(t.x - t.targetX) < 30) {
+    t.targetX = W * 0.3 + Math.random() * W * 0.4;
+    t.targetY = H * 0.6 + Math.random() * H * 0.15;
+  }
+  const dx = t.targetX - t.x;
+  const dy = t.targetY - t.y;
+  const speedMult = t.moveSpeed || 1;
+  t.vx += dx * 0.0003 * speedMult;  // velocidad escala con el nivel
+  t.vy += dy * 0.0003 * speedMult;
+  t.vx *= 0.92;
+  t.vy *= 0.92;
+  t.x += t.vx;
+  t.y += t.vy;
+
+  // Keep within bounds
+  t.x = clamp(t.x, t.size * 0.5, W - t.size * 0.5);
+  // Mantener a Trump en el área del escenario (entre el horizonte y el borde inferior)
+  t.y = clamp(t.y, H * 0.58, H * 0.78);
+
+  // Mouth animation cycle
+  t.mouthTimer -= dt;
+  if (t.mouthTimer <= 0) {
+    // Start speaking
+    t.mouthTarget = 0.85;
+    t.speechTimer = 0;
+    t.currentPhrase = PHRASES[Math.floor(Math.random() * PHRASES.length)];
+    showSpeechBubble(t.currentPhrase);
+    t.mouthTimer = t.mouthInterval;
+  }
+
+  // Speech in progress
+  if (t.mouthTarget > 0.5) {
+    t.speechTimer += dt;
+    // Trump "speaks" — mouth oscillates
+    t.mouthOpen = 0.6 + Math.sin(t.speechTimer * 8) * 0.3;
+
+    // If speech goes too long, Trump finished his incoherent phrase!
+    if (t.speechTimer >= t.speechMax) {
+      hideSpeechBubble();
+      // Trump dijo una incoherencia completa → pierde un crédito
+      state.credits--;
+      showFloatingScore(W / 2, H * 0.35, 'CRÉDITO PERDIDO (-1)');
+      // Sacudida leve de la pantalla
+      state.trump.screenShake = 8;
+      // Resetear la boca
+      t.mouthTarget = 0;
+      t.mouthOpen = 0;
+      t.speechTimer = 0;
+      t.mouthTimer = t.mouthInterval;
+      // Si se quedó sin créditos → Game Over
+      if (state.credits <= 0) {
+        endGame();
+      }
+      return;
+    }
+  } else {
+    // Closing mouth
+    t.mouthOpen = Math.max(0, t.mouthOpen - dt * 3);
+    if (t.mouthOpen <= 0.05) {
+      hideSpeechBubble();
+    }
+  }
+
+  // Hit flash decay
+  if (t.hitFlash > 0) t.hitFlash -= dt;
+  if (t.choke > 0) {
+    t.choke -= dt * 2;
+    if (t.choke < 0) t.choke = 0;
+  }
+
+  // Combo timer decay
+  if (state.combo > 0) {
+    state.comboTimer -= dt;
+    if (state.comboTimer <= 0) {
+      state.combo = 0;
+      document.getElementById('combo-panel').classList.add('hidden');
+    }
+  }
+
+  // Popcorn refill
+  if (state.popcorn < state.maxPopcorn) {
+    state.refillTimer += dt;
+    if (state.refillTimer >= 1) {
+      state.popcorn++;
+      state.refillTimer = 0;
+      updateHUD();
+    }
+  }
+}
+
+// ============ PEDO ENORME ============
+// Trump suelta un pedo cuando el estómago llega a 100%.
+// Se desinfla el abdomen, sacudida de pantalla, nubes de gas verde.
+function triggerFart() {
+  SFX.fart();
+  state.trump.farting = 1.5;  // 1.5 segundos de pedo
+  state.trump.foodLevel = 0;  // se desinfla todo
+  state.trump.screenShake = 20;  // sacudida de pantalla
+
+  // Spawnear nubes de gas verde detrás de Trump
+  for (let i = 0; i < 20; i++) {
+    const angle = Math.random() * Math.PI * 0.6 - Math.PI * 0.3;  // hacia abajo-atrás
+    const speed = 3 + Math.random() * 6;
+    state.fartClouds.push({
+      x: state.trump.x + (Math.random() - 0.5) * 30,
+      y: state.trump.y + state.trump.size * 0.8,
+      vx: Math.cos(angle + Math.PI / 2) * speed * (Math.random() > 0.5 ? 1 : -1),
+      vy: Math.sin(angle) * speed + 1,
+      size: 15 + Math.random() * 25,
+      growth: 0.5 + Math.random() * 0.8,  // las nubes crecen con el tiempo
+      life: 2.5 + Math.random(),
+      maxLife: 2.5 + Math.random(),
+      greenness: 0.6 + Math.random() * 0.3,
+    });
+  }
+
+  // Mostrar texto "¡PUAJ!"
+  showFloatingScore(state.trump.x, state.trump.y - state.trump.size, '💨 ¡PUAJ! 💨');
+
+  // Bonus de puntos por el pedo
+  state.score += 100;
+  showFloatingScore(state.trump.x, state.trump.y + 20, '+100 PEDO BONUS!');
+
+  // La multitud se asusta / festeja aún más
+  state.crowdCheer = 2.0;
+  // ¡Los espectadores se desmayan del pedo y ruedan por el piso!
+  state.crowdFaint = 3.0;  // 3 segundos de espectadores tirados en el piso
+
+  // Contar el pedo para la victoria
+  state.fartsTriggered++;
+  showFloatingScore(W / 2, H * 0.4, 'PEDO ' + state.fartsTriggered + '/' + state.fartsToWin);
+
+  // Si llegó a 5 pedos → ¡VICTORIA!
+  if (state.fartsTriggered >= state.fartsToWin) {
+    setTimeout(() => triggerVictory(), 2000);  // esperar a que termine el pedo
+  }
+}
+
+function updateFart(dt) {
+  // Decrecer el timer del pedo
+  if (state.trump.farting > 0) {
+    state.trump.farting -= dt;
+    // Durante el pedo, seguir soltando gas poco a poco
+    if (Math.random() < 0.3) {
+      state.fartClouds.push({
+        x: state.trump.x + (Math.random() - 0.5) * 40,
+        y: state.trump.y + state.trump.size * 0.8,
+        vx: (Math.random() - 0.5) * 4,
+        vy: -1 - Math.random() * 2,
+        size: 10 + Math.random() * 15,
+        growth: 0.3 + Math.random() * 0.5,
+        life: 1.5 + Math.random(),
+        maxLife: 1.5 + Math.random(),
+        greenness: 0.5 + Math.random() * 0.3,
+      });
+    }
+  }
+
+  // Sacudida de pantalla
+  if (state.trump.screenShake > 0) {
+    state.trump.screenShake -= dt * 30;
+    if (state.trump.screenShake < 0) state.trump.screenShake = 0;
+  }
+
+  // Actualizar nubes de gas
+  for (let i = state.fartClouds.length - 1; i >= 0; i--) {
+    const c = state.fartClouds[i];
+    c.x += c.vx;
+    c.y += c.vy;
+    c.vy += 0.05;  // las nubes suben y luego caen un poco
+    c.vx *= 0.98;  // fricción
+    c.size += c.growth;  // las nubes crecen
+    c.life -= dt;
+    if (c.life <= 0) state.fartClouds.splice(i, 1);
+  }
+}
+
+function drawFartClouds() {
+  for (const c of state.fartClouds) {
+    const alpha = c.life / c.maxLife;
+    // Verde-amarillento, más intenso cuanto mayor greenness
+    const r = Math.floor(180 - c.greenness * 60);
+    const g = Math.floor(200 + c.greenness * 30);
+    const b = Math.floor(60 + (1 - c.greenness) * 40);
+    ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + alpha * 0.5 + ')';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2);
+    ctx.fill();
+    // Núcleo más oscuro
+    ctx.fillStyle = 'rgba(100, 160, 40, ' + alpha * 0.3 + ')';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.size * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent = state.score;
+  document.getElementById('level').textContent = state.level;
+  document.getElementById('popcorn-count').textContent = state.popcorn;
+  updateProjectileSelector();
+}
+
+// Comprueba qué proyectiles se desbloquean según el nivel actual.
+// Al desbloquear, da munición inicial y cambia al nuevo proyectil.
+function checkProjectileUnlock() {
+  for (const key of PROJECTILE_KEYS) {
+    if (UNLOCK_AT_LEVEL[key] <= state.level && (state.ammo[key] || 0) === 0 && key !== 'popcorn') {
+      // Desbloquear: dar 3 de munición inicial
+      state.ammo[key] = 3;
+      // Cambiar al nuevo proyectil automáticamente
+      state.currentProjectile = key;
+      const ptype = PROJECTILES[key];
+      showFloatingScore(W / 2, H * 0.4, '¡' + ptype.emoji + ' ' + ptype.name.toUpperCase() + ' DESBLOQUEADA!');
+      SFX.unlock();
+    }
+  }
+}
+
+// Actualiza el selector visual de proyectiles
+function updateProjectileSelector() {
+  const container = document.getElementById('projectile-selector');
+  if (!container) return;
+  let html = '';
+  for (const key of PROJECTILE_KEYS) {
+    const ptype = PROJECTILES[key];
+    const unlocked = UNLOCK_AT_LEVEL[key] <= state.level;
+    const ammo = key === 'popcorn' ? '∞' : (state.ammo[key] || 0);
+    const active = state.currentProjectile === key;
+    const disabled = !unlocked || (key !== 'popcorn' && ammo <= 0);
+    html += '<button class="proj-btn' + (active ? ' active' : '') + (disabled ? ' disabled' : '') + '" data-proj="' + key + '"' + (disabled ? ' disabled' : '') + '>'
+      + '<span class="proj-emoji">' + ptype.emoji + '</span>'
+      + '<span class="proj-name">' + ptype.name + '</span>'
+      + '<span class="proj-ammo">' + ammo + '</span>'
+      + (unlocked ? '' : '<span class="proj-lock">Lv' + UNLOCK_AT_LEVEL[key] + '</span>')
+      + '</button>';
+  }
+  container.innerHTML = html;
+  // Asignar listeners
+  container.querySelectorAll('.proj-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('disabled')) return;
+      state.currentProjectile = btn.dataset.proj;
+      updateProjectileSelector();
+    });
+  });
+}
+
+// ============ MAIN LOOP ============
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  // Siempre actualizar la fase de animación (incluso en el menú)
+  state.trump.bobPhase += dt * 2;
+
+  // Decrecer el festejo de la multitud
+  if (state.crowdCheer > 0) state.crowdCheer -= dt;
+  if (state.crowdFaint > 0) state.crowdFaint -= dt;
+
+  if (state.playing) {
+    updateTrump(dt);
+    updatePopcorns(dt);
+    updateParticles(dt);
+    updateFart(dt);
+
+    // Auto-throw while mouse held
+    if (state.mouseDown && now - state.lastThrow >= state.throwInterval) {
+      throwPopcorn(state.mouseX, state.mouseY);
+      state.lastThrow = now;
+    }
+  }
+
+  // Render con sacudida de pantalla por el pedo
+  ctx.save();
+  if (state.trump.screenShake > 0) {
+    const shakeX = (Math.random() - 0.5) * state.trump.screenShake;
+    const shakeY = (Math.random() - 0.5) * state.trump.screenShake;
+    ctx.translate(shakeX, shakeY);
+  }
+  drawBackground();
+
+  // Dibujar Trump SIEMPRE (incluso en el menú) para que se vea atractivo
+  if (state.playing || state.gameOver) {
+    // Aplicar perspectiva: Trump se ve más grande cuando está abajo (cerca)
+    // y más pequeño cuando está arriba (lejos)
+    const horizonY = H * 0.55;
+    const t = state.trump;
+    const yProgress = clamp((t.y - horizonY) / (H - horizonY), 0, 1);
+    const perspectiveScale = 0.5 + yProgress * 0.7;  // 0.5 en el horizonte, 1.2 abajo
+    const trumpForDraw = {
+      ...t,
+      size: t.size * perspectiveScale,
+    };
+    drawTrump(trumpForDraw);
+
+    // Draw popcorns
+    for (const p of state.popcorns) {
+      drawPopcorn(p);
+    }
+
+    // Draw particles
+    for (const p of state.particles) {
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.life;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    // En el menú de inicio: dibujar a Trump a la derecha, completo, con la boca animada
+    const menuTrump = {
+      x: W * 0.78,
+      y: H * 0.55,
+      size: Math.min(180, Math.min(W, H) * 0.25),
+      mouthOpen: 0.35 + Math.sin(state.trump.bobPhase * 1.5) * 0.25,
+      bobPhase: state.trump.bobPhase * 1.5,
+      hitFlash: 0,
+      choke: 0,
+    };
+    drawTrump(menuTrump);
+  }
+
+  // Dibujar nubes de gas del pedo (siempre, incluso en menú)
+  drawFartClouds();
+
+  // Cerrar el save de la sacudida de pantalla
+  ctx.restore();
+
+  // Dibujar barra de comida/inflado del abdomen
+  if (state.playing) {
+    drawFoodBar();
+    drawCreditsAndFarts();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// Barra de comida del estómago (indica cuánto falta para el pedo)
+function drawFoodBar() {
+  const barW = 240;
+  const barH = 16;
+  const barX = (W - barW) / 2;
+  const barY = 50;  // Arriba en el centro, debajo del HUD
+  // Fondo negro con borde blanco
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillRect(barX - 4, barY - 4, barW + 8, barH + 24);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(barX - 4, barY - 4, barW + 8, barH + 24);
+  // Relleno
+  const pct = state.trump.foodLevel / 100;
+  let r, g, b;
+  if (pct < 0.5) {
+    r = Math.floor(pct * 2 * 255);
+    g = 200;
+    b = 50;
+  } else {
+    r = 255;
+    g = Math.floor((1 - (pct - 0.5) * 2) * 200);
+    b = 50;
+  }
+  ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+  ctx.fillRect(barX, barY, barW * pct, barH);
+  // Borde del relleno
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX, barY, barW, barH);
+  // Texto
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'center';
+  const label = pct >= 0.9 ? '💨 ¡INMINENTE! 💨' : '🍔 Estómago: ' + Math.floor(pct * 100) + '%';
+  ctx.fillText(label, W / 2, barY + barH + 14);
+}
+
+// ============ INPUT ============
+canvas.addEventListener('mousedown', (e) => {
+  if (!state.playing) return;
+  const rect = canvas.getBoundingClientRect();
+  state.mouseX = e.clientX - rect.left;
+  state.mouseY = e.clientY - rect.top;
+  state.mouseDown = true;
+  state.lastThrow = 0;
+  throwPopcorn(state.mouseX, state.mouseY);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  state.mouseX = e.clientX - rect.left;
+  state.mouseY = e.clientY - rect.top;
+});
+
+canvas.addEventListener('mouseup', () => {
+  state.mouseDown = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  state.mouseDown = false;
+});
+
+// Touch support
+canvas.addEventListener('touchstart', (e) => {
+  if (!state.playing) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  state.mouseX = t.clientX - rect.left;
+  state.mouseY = t.clientY - rect.top;
+  state.mouseDown = true;
+  state.lastThrow = 0;
+  throwPopcorn(state.mouseX, state.mouseY);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  state.mouseX = t.clientX - rect.left;
+  state.mouseY = t.clientY - rect.top;
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  state.mouseDown = false;
+});
+
+// Buttons
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+// Atajos de teclado para empezar/reiniciar el juego
+window.addEventListener('keydown', (e) => {
+  // Espacio o Enter para empezar (cuando estamos en menú o game over)
+  if ((e.key === ' ' || e.key === 'Enter') && !state.playing) {
+    e.preventDefault();
+    startGame();
+    return;
+  }
+  // 'R' para reiniciar (cuando estamos jugando)
+  if ((e.key === 'r' || e.key === 'R') && state.playing) {
+    e.preventDefault();
+    startGame();
+    return;
+  }
+});
+
+// Dibuja los créditos (corazones) y el contador de pedos para victoria
+function drawCreditsAndFarts() {
+  // Créditos: corazones ❤️ en la esquina superior central-izquierda
+  const credX = W / 2 - 60;
+  const credY = 14;
+  ctx.font = '20px serif';
+  ctx.textAlign = 'left';
+  for (let i = 0; i < state.maxCredits; i++) {
+    if (i < state.credits) {
+      ctx.fillText('❤️', credX + i * 26, credY + 16);
+    } else {
+      ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+      ctx.fillText('🖤', credX + i * 26, credY + 16);
+      ctx.fillStyle = '#fff';
+    }
+  }
+
+  // Contador de pedos para victoria: 💨 X/5 en la esquina superior central-derecha
+  const fartX = W / 2 + 20;
+  const fartY = 14;
+  ctx.font = '16px monospace';
+  ctx.fillStyle = '#22c55e';
+  ctx.textAlign = 'left';
+  let fartIcons = '';
+  for (let i = 0; i < state.fartsToWin; i++) {
+    fartIcons += i < state.fartsTriggered ? '💨' : '○ ';
+  }
+  ctx.font = '14px serif';
+  ctx.fillText(fartIcons, fartX, fartY + 14);
+  ctx.font = '10px monospace';
+  ctx.fillStyle = '#71717a';
+  ctx.fillText(state.fartsTriggered + '/' + state.fartsToWin + ' pedos', fartX, fartY + 28);
+}
+
+// Character selection buttons
+document.querySelectorAll('.char-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.char-btn').forEach(b => {
+      b.classList.remove('active');
+      b.style.borderColor = 'rgba(255,255,255,0.2)';
+    });
+    btn.classList.add('active');
+    btn.style.borderColor = '#fbbf24';
+    currentCharacter = btn.dataset.char;
+    PHRASES = CHARACTERS[currentCharacter].phrases;
+  });
+});
+
+// Mute button
+document.getElementById('mute-btn').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  document.getElementById('mute-btn').textContent = soundEnabled ? '🔊' : '🔇';
+  if (soundEnabled) {
+    initAudio();
+    SFX.start();
+  }
+});
+
+// Start loop
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
